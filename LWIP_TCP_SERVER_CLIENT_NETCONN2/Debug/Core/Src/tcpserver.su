@@ -1,0 +1,3 @@
+../Core/Src/tcpserver.c:16:13:tcp_thread	32	static
+../Core/Src/tcpserver.c:45:6:tcpserver_init	16	static
+../Core/Src/tcpserver.c:50:13:copyString	32	static

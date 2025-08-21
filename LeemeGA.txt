@@ -1,0 +1,1 @@
+Shift boton derecho o ctl boton derecho y abro el git bash, desde ahí comiteo y además hago el push al repo (que tengo que haber creado antes)

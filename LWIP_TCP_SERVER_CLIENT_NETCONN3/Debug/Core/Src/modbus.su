@@ -1,0 +1,9 @@
+../Core/Src/modbus.c:23:10:mb_process	32	static
+../Core/Src/modbus.c:55:17:mb_process_pdu_read_fn	32	static
+../Core/Src/modbus.c:85:17:mb_process_pdu_write_single_fn	32	static
+../Core/Src/modbus.c:107:13:mb_mbap_copy	16	static
+../Core/Src/modbus.c:115:16:mb_process_start_address	24	static
+../Core/Src/modbus.c:147:16:mb_process_val	24	static
+../Core/Src/modbus.c:158:17:mb_process_err	16	static
+../Core/Src/modbus.c:164:17:mb_pdu_calculate_N	16	static
+../Core/Src/modbus.c:182:6:read_coils	24	static

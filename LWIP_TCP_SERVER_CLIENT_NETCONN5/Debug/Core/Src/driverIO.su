@@ -1,0 +1,5 @@
+../Core/Src/driverIO.c:24:6:inputOutputControl	8	static
+../Core/Src/driverIO.c:48:6:TurnOnRedLED	8	static
+../Core/Src/driverIO.c:54:6:TurnOffRedLED	8	static
+../Core/Src/driverIO.c:60:6:ReadGPIO	8	static
+../Core/Src/driverIO.c:95:6:WriteGPIO	8	static

@@ -1,0 +1,8 @@
+../Core/Src/modbus.c:22:10:mb_process	6
+../Core/Src/modbus.c:54:17:mb_process_pdu_read_fn	2
+../Core/Src/modbus.c:84:17:mb_process_pdu_write_single_fn	3
+../Core/Src/modbus.c:106:13:mb_mbap_copy	1
+../Core/Src/modbus.c:114:16:mb_process_start_address	13
+../Core/Src/modbus.c:146:16:mb_process_val	4
+../Core/Src/modbus.c:157:17:mb_process_err	1
+../Core/Src/modbus.c:163:17:mb_pdu_calculate_N	5

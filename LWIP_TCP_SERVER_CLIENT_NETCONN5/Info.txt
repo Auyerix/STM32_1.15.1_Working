@@ -1,0 +1,52 @@
+Esta versión NETCONN5 tiene las siguientes configuraciones:
+CMSIS_V1 para que funcione TCP/IP y no se cuelgue.. También se hace el server init:
+void tcpserver_init(void) {
+	sys_thread_new("tcp_thread", tcp_thread, NULL, DEFAULT_THREAD_STACKSIZE,
+			osPriorityNormal);
+}
+ se dejó DEFAULT_THREAD_STACKSIZE y no se multiplicó por 8 como estaba en el ejemplo de servidor
+ 
+ Además dejo los valores originales de la configuración lwip:
+ #define MEM_SIZE (10 * 1024) // 20 KB  (tenía 10 * 1024. lo pasé a 20 pero no afectó, lo volví a 10)
+#define TCP_SND_BUF 1072 bytes(s)
+#define TCP_WND (4 * TCP_MSS) (tiene 2144)
+
+Finalmente volví la prioridad de Ethernet a 5 como la configuró el IDE
+
+*************************************************************************************
+Pruebas de funciones Modbus
+
+//Inicio pruebas con respuestas reales 22/10/24
+//Prueba función leer Coils
+uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x01,0x00,0x00,0x00,0x20};
+//Prueba función leer holding
+//uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x03,0x00,0x00,0x00,0x02};
+//Prueba función leer discrete
+//uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x02,0x00,0x00,0x00,0x4};
+//Prueba función para escribir un coil
+//uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x05,0x00,0x01,0xFF,0x00};
+AA 55 00 00 00 06 2A 05 00 01 FF 00
+//Prueba función para escribir un registro
+//uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x06,0x00,0x01,0x55,0x80};
+//Prueba función leer entradas analógica
+//uint8_t mb_req_buf[] = {0xAA,0x55,0x00,0x00,0x00,0x06,0x2A,0x04,0x00,0x00,0x00,0x4};
+
+Valores iniciales cargados en Hercules para manejo de coils
+AA 55 00 00 00 06 2A 01 00 00 00 08
+AA 55 00 00 00 06 2A 01 00 00 00 10
+AA 55 00 00 00 06 2A 01 00 00 00 18
+**************************************************************************************
+
+23/12/24 Ya funcionando al querer agregar una tareas me dejaba ping pero no levantaba el servidor
+Aumenté TOTAL_HEAP_SIZE de 153600 bytes (que me lo trajo por default) a 20000 y funcionó ok
+//LED ROJO Onboard indica Servidor Ok
+//LED ROJO en Board de InOut indica conexión al cliente (utilizado en tcpserver.c)
+//LED AZUL asociado a MB Register 12 solo para pruebas
+
+17/1/25
+En el registro holding_registers[MB_SWITH] [7] (Holding Register 8 en Modbus) si hago una transición de 0 a 1 grabo en la EEPROM los 
+valores de IP que están alojados en registros 10 a 21 con sus nombres de macro definidos (en EEPROM,c)
+En el registro holding_registers[MB_SWITH] [7] (Holding Register 8 en Modbus) si hago una transición de 0 a 2 leo y cargo en los registros
+10 a 21 lo que tiene la EEPROM cargada.
+Si arranco el programa con el botón azul presionado no lee de la EEPROM y toma los valores que tiene por 
+default hardcodeados 192.168.1.130

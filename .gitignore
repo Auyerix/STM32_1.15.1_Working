@@ -1,0 +1,38 @@
+# Ignorar carpetas de compilación y salidas binarias
+/Debug/
+/Release/
+/build/
+
+# Archivos generados por el IDE
+*.launch
+*.settings/
+*.log
+*.swp
+*.bak
+*.tmp
+*.user
+
+# Archivos binarios
+*.o
+*.a
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.srec
+
+# Archivos de respaldo
+*~
+*.bak
+
+# Archivos comprimidos
+*.zip
+
+# Otros archivos temporales
+*.d
+*.lst
+
+# Archivos generados por sistemas operativos
+.DS_Store
+Thumbs.db

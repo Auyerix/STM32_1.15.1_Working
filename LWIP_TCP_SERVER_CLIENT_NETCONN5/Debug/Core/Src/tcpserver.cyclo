@@ -1,0 +1,6 @@
+../Core/Src/tcpserver.c:25:13:tcp_thread	3
+../Core/Src/tcpserver.c:74:6:tcpserver_init	1
+../Core/Src/tcpserver.c:79:13:copyString	2
+../Core/Src/tcpserver.c:88:13:process_client_connection	3
+../Core/Src/tcpserver.c:114:14:initialize_server	3
+../Core/Src/tcpserver.c:150:6:enable_keepalive	3

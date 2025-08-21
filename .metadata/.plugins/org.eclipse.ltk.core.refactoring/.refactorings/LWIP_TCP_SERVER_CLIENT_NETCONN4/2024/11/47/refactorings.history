@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;LWIP_TCP_SERVER_CLIENT_NETCONN4/LWIP_TCP_SERVER_CLIENT_NETCONN3.ioc&apos; to &apos;LWIP_TCP_SERVER_CLIENT_NETCONN4.ioc&apos;" description="Rename resource &apos;LWIP_TCP_SERVER_CLIENT_NETCONN3.ioc&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="LWIP_TCP_SERVER_CLIENT_NETCONN3.ioc" name="LWIP_TCP_SERVER_CLIENT_NETCONN4.ioc" stamp="1732226686369" updateReferences="true"/>
+</session>

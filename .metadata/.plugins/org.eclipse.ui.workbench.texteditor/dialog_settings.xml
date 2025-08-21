@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="selection" value="TurnOnRedLED"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="TurnOnRedLED"/>
+			<item value="enable_keepalive"/>
+			<item value="USER_"/>
+			<item value="user_"/>
+			<item value="PIN_13"/>
+			<item value="PC13"/>
+			<item value="Blue"/>
+			<item value="red"/>
+			<item value="RED"/>
+			<item value="Ethernet"/>
+			<item value="StartDefaultTask"/>
+			<item value="MutexHandle"/>
+			<item value="paso por"/>
+			<item value="LWIP_PLATFORM_DIAG"/>
+			<item value="TmrQ"/>
+		</list>
+		<list key="replacehistory">
+			<item value="uint8_t"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="1344"/>
+		<item key="DIALOG_Y_ORIGIN" value="219"/>
+		<item key="DIALOG_WIDTH" value="414"/>
+		<item key="DIALOG_HEIGHT" value="454"/>
+		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-15|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="886"/>
+		<item key="DIALOG_Y_ORIGIN" value="489"/>
+	</section>
+</section>

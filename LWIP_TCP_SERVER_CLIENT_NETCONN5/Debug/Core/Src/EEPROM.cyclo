@@ -1,0 +1,5 @@
+../Core/Src/EEPROM.c:50:17:bytestowrite	2
+../Core/Src/EEPROM.c:62:26:EEPROM_Write	4
+../Core/Src/EEPROM.c:110:19:EEPROM_Read	4
+../Core/Src/EEPROM.c:141:13:EEPROM_PageErase	1
+../Core/Src/EEPROM.c:158:6:detectTransitions	7
