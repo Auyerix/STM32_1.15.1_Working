@@ -8,3 +8,4 @@ out_coil_status
 IP_From_Eeprom
 IP_To_Eeprom
 auxiliar
+SystemCoreClock
