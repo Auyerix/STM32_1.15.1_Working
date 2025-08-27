@@ -1,0 +1,458 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include <string.h>
+#include <stdio.h>
+#include <stdbool.h>
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define MAX_AT_CMD_LEN 128
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim3;
+
+UART_HandleTypeDef huart1;
+
+/* USER CODE BEGIN PV */
+
+uint8_t step;
+uint16_t count = 0;
+
+const char* APN = "gprs.claro.com.ar";
+const char* MQTT_HOST = "test.mosquitto.org";
+uint16_t MQTT_PORT = 1883;
+char buffer[128];                  // buffer de recepción
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_TIM3_Init(void);
+/* USER CODE BEGIN PFP */
+
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+// -------------------------------------------------
+// Función para transmitir AT y recibir respuesta
+// -------------------------------------------------
+bool SIMTransmit(char *cmd, char* expected, uint32_t timeout_ms)
+{
+    memset(buffer, 0, sizeof(buffer));
+    HAL_UART_Transmit(&huart1, (uint8_t *)cmd, strlen(cmd), 1000);
+    HAL_UART_Receive(&huart1, (uint8_t *)buffer, sizeof(buffer), timeout_ms);
+
+    // Buscar la cadena esperada en la respuesta
+    if (strstr(buffer, expected) != NULL)
+        return true;
+    else
+        return false;
+}
+
+// -------------------------------------------------
+// Configuración MQTT
+// -------------------------------------------------
+#define MAX_AT_CMD_LEN 128
+
+// -------------------------------------------------
+// Funciones MQTT
+// -------------------------------------------------
+bool MQTT_Init(void)
+{
+    char cmd[MAX_AT_CMD_LEN];
+
+    // 1) Esperar que el módulo esté listo (RDY)
+    if(!SIMTransmit("", "RDY", 10000)) {
+        return false; // Módulo no listo
+    }
+
+    // 2) Registro en red
+    if(!SIMTransmit("AT+CGREG?\r\n", "OK", 1000)) return false;
+
+    // 3) Activar PDP
+    if(!SIMTransmit("AT+CGATT=1\r\n", "OK", 1000)) return false;
+    sprintf(cmd,"AT+CGDCONT=1,\"IP\",\"%s\"\r\n", APN);
+    if(!SIMTransmit(cmd, "OK", 1000)) return false;
+    if(!SIMTransmit("AT+CGACT=1,1\r\n", "OK", 1000)) return false;
+
+    // 4) Iniciar servicio MQTT
+    if(!SIMTransmit("AT+CMQTTSTART\r\n", "+CMQTTSTART: 0", 2000)) return false;
+
+    // 5) Crear cliente MQTT
+    sprintf(cmd,"AT+CMQTTACCQ=0,\"cli01\",1\r\n");
+    if(!SIMTransmit(cmd, "OK", 2000)) return false;
+
+    return true;
+}
+
+bool MQTT_Publish(const char* topic, const char* payload)
+{
+    char cmd[MAX_AT_CMD_LEN];
+    int tlen = strlen(topic);
+    int plen = strlen(payload);
+
+    // Topic
+    sprintf(cmd,"AT+CMQTTTOPIC=0,%d\r\n", tlen);
+    if(!SIMTransmit(cmd, ">", 500)) return false;
+    if(!SIMTransmit((char*)topic, "OK", 500)) return false;
+
+    // Payload
+    sprintf(cmd,"AT+CMQTTPAYLOAD=0,%d\r\n", plen);
+    if(!SIMTransmit(cmd, ">", 500)) return false;
+    if(!SIMTransmit((char*)payload, "OK", 500)) return false;
+
+    // Publicar
+    if(!SIMTransmit("AT+CMQTTPUB=0,1,60\r\n", "OK", 2000)) return false;
+
+    return true;
+}
+
+void MQTT_Disconnect(void)
+{
+    SIMTransmit("AT+CMQTTDISC=0,60\r\n", "OK", 500);
+    SIMTransmit("AT+CMQTTREL=0\r\n", "OK", 500);
+    SIMTransmit("AT+CMQTTSTOP\r\n", "OK", 500);
+}
+
+void MQTT_Reset(void)
+{
+    SIMTransmit("AT+CFUN=1,1\r\n", "RDY", 5000);
+    HAL_Delay(2000);
+}
+
+
+
+
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM3) // confirmamos que viene de TIM2
+  {
+    HAL_GPIO_TogglePin(LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin); // ejemplo:
+  }
+}
+
+void Timer3_SetPeriod_ms(uint32_t ms)
+{
+    uint32_t arr = (ms * 10) - 1; // porque 1 tick = 0.1ms
+    __HAL_TIM_SET_AUTORELOAD(&htim3, arr);
+}
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART1_UART_Init();
+  MX_TIM3_Init();
+  /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start_IT(&htim3);// arranca timer en modo interrupción
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  uint32_t lastPublish = HAL_GetTick();  // local
+  uint32_t now = 0;                           // local
+
+  while (1)
+  {
+
+	  Timer3_SetPeriod_ms(500);  // ahora el timer interrumpe cada 500ms
+
+	//HAL_ADC_PollForConversion(&hadc1,1000);
+	//readValue = HAL_ADC_GetValue(&hadc1);
+	//readValue = 1000;
+	//sprintf(charData, "%d\r\n", readValue);
+
+	step = 0;
+      // Cada 10 segundos
+      if (now - lastPublish >= 10000)
+      {
+    	  step = 1;
+    	  lastPublish = now;
+
+          // Leer datos de sensores
+          char payload[64];
+          sprintf(payload, "Valor de ejemplo: %d", 123); // reemplazar con tus datos
+
+          // Publicar y reintentar si falla
+          if (!MQTT_Publish("test/topic", payload))
+          {
+              // Detectó error, reiniciar módulo
+              MQTT_Reset();
+              if(MQTT_Init())
+              {
+            	  step = 2;
+            	  MQTT_Publish("test/topic", payload);
+              }
+          }
+      }
+
+      // Aquí podés meter otras tareas no bloqueantes
+      // sin interferir con la publicación
+  }
+
+  // Nunca llega acá, pero si querés
+  MQTT_Disconnect();
+
+
+
+
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
+
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 25;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 8400;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 5000;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED_ON_BOARD_Pin */
+  GPIO_InitStruct.Pin = LED_ON_BOARD_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_ON_BOARD_GPIO_Port, &GPIO_InitStruct);
+
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
