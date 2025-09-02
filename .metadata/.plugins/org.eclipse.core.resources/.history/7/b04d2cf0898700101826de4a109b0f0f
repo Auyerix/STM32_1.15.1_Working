@@ -1,0 +1,196 @@
+
+#include "stm32f4xx_hal.h"
+#include <mqtt_functions.h>
+
+
+// -------------------------------------------------
+// Función para transmitir AT y recibir respuesta
+// -------------------------------------------------
+bool SIMTransmit_OLD(char *cmd, char* expected, uint32_t timeout_ms)
+{
+    memset(buffer, 0, sizeof(buffer));
+
+    // Enviar comando solo si cmd no es vacío
+    if(strlen(cmd) > 0)
+        HAL_UART_Transmit(&huart1, (uint8_t *)cmd, strlen(cmd), 1000);
+
+    HAL_UART_Receive(&huart1, (uint8_t *)buffer, sizeof(buffer), timeout_ms);
+
+    if (expected == NULL) return true; // no se espera respuesta
+    return (strstr(buffer, expected) != NULL);
+}
+bool SIMTransmit(char *cmd, char* expected, uint32_t timeout_ms)
+{
+    memset(buffer, 0, sizeof(buffer));
+
+    // Enviar comando solo si cmd no es vacío
+    if(strlen(cmd) > 0)
+        HAL_UART_Transmit(&huart1, (uint8_t *)cmd, strlen(cmd), 1000);
+
+    HAL_UART_Receive(&huart1, (uint8_t *)buffer, sizeof(buffer), timeout_ms);
+
+    if (expected == NULL) return true; // no se espera respuesta
+    return (strstr(buffer, expected) != NULL);
+}
+
+// -------------------------------------------------
+// Espera hasta que el módulo esté en red y con IP
+// -------------------------------------------------
+bool SIM_WaitForNetwork_Funcionaba(uint32_t timeout_ms) {
+    uint32_t start = HAL_GetTick();
+
+    step = 1;
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        // 1. Verificar si responde AT
+        SIMTransmit("AT\r\n", "OK", 1000);
+
+        // 2. Verificar registro en red
+        SIMTransmit("AT+CGREG?\r\n", "0,1", 2000);
+
+        // 3. Verificar GPRS adjunto
+        SIMTransmit("AT+CGATT?\r\n", "+CGATT: 1", 2000);
+
+        // 4. Obtener IP
+        SIMTransmit("AT+CGPADDR=1\r\n", NULL, 2000);
+        if (strstr(buffer, "10.") || strstr(buffer, "100.") ||
+            strstr(buffer, "172.") || strstr(buffer, "192.")) {
+            return true; // Todo listo
+        }
+
+        HAL_Delay(500);
+    }
+
+    return false; // Timeout
+}
+// -------------------------------------------------
+// Espera hasta que el módulo esté en red y con IP
+// -------------------------------------------------
+bool SIM_WaitForNetwork(uint32_t timeout_ms) {
+    uint32_t start = HAL_GetTick();
+
+    step = 1;  // tu variable de debug
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        // 1. Verificar si responde AT
+        if (!SIMTransmit("AT\r\n", "OK", 1000)) {
+            HAL_Delay(500);
+            continue; // si ni responde AT, reintentar
+        }
+;
+        // 2. Verificar registro en red (aceptar local y roaming)
+        if (!SIMTransmit("AT+CGREG?\r\n", "0,1", 2000) &&
+            !SIMTransmit("AT+CGREG?\r\n", "0,5", 2000)) {
+            HAL_Delay(500);
+            continue;
+        }
+
+        // 3. Verificar GPRS adjunto
+        if (!SIMTransmit("AT+CGATT?\r\n", "+CGATT: 1", 2000)) {
+            HAL_Delay(500);
+            continue;
+        }
+
+        // 4. Obtener IP
+        SIMTransmit("AT+CGPADDR=1\r\n", NULL, 2000);
+        if (strstr(buffer, "10.") || strstr(buffer, "100.") ||
+            strstr(buffer, "172.") || strstr(buffer, "192.")) {
+            return true; // Todo listo
+        }
+
+        HAL_Delay(500);
+    }
+
+    return false; // Timeout
+}
+// -------------------------------------------------
+// Inicialización MQTT
+// -------------------------------------------------
+bool MQTT_Init(void)
+{
+    char cmd[MAX_AT_CMD_LEN];
+    step = 2;
+    // 1) Esperar que el módulo esté listo
+    if(!SIMTransmit("AT\r\n", "OK", 1000)) return false;
+
+    // 2) Registro en red
+    if(!SIMTransmit("AT+CGREG?\r\n", "OK", 1000)) return false;
+
+    // 3) Activar PDP
+    if(!SIMTransmit("AT+CGATT=1\r\n", "OK", 1000)) return false;
+    sprintf(cmd,"AT+CGDCONT=1,\"IP\",\"%s\"\r\n", APN);
+    if(!SIMTransmit(cmd, "OK", 1000)) return false;
+    if(!SIMTransmit("AT+CGACT=1,1\r\n", "OK", 1000)) return false;
+
+    // 4) Iniciar servicio MQTT
+    if(!SIMTransmit("AT+CMQTTSTART\r\n", "+CMQTTSTART: 0", 2000)) return false;
+
+    // 5) Crear cliente MQTT
+    sprintf(cmd,"AT+CMQTTACCQ=0,\"%s\"\r\n", MQTT_CLIENT);
+    if(!SIMTransmit(cmd, "OK", 2000)) return false;
+
+    return true;
+}
+
+// -------------------------------------------------
+// Publicar mensaje
+// -------------------------------------------------
+bool MQTT_Publish(const char* topic, const char* payload)
+{
+    char ATcommand[MAX_AT_CMD_LEN];
+
+    // -------------------------
+    // 1) Enviar TOPIC
+    // -------------------------
+    sprintf(ATcommand,"AT+CMQTTTOPIC=0,%d\r\n", strlen(topic));
+    SIMTransmit(ATcommand, NULL, 500);  // enviar comando, no esperar respuesta
+
+    // Enviar topic real SIN CRLF
+    SIMTransmit((char*)topic, NULL, 500);  // solo enviar datos
+
+    // -------------------------
+    // 2) Enviar PAYLOAD
+    // -------------------------
+    sprintf(ATcommand,"AT+CMQTTPAYLOAD=0,%d\r\n", strlen(payload));
+    if(!SIMTransmit(ATcommand, ">", 1000)) return false;  // esperar prompt >
+
+    // Enviar payload real
+    SIMTransmit((char*)payload, NULL, 500);  // solo enviar datos
+
+    // -------------------------
+    // 3) Publicar
+    // -------------------------
+    if(!SIMTransmit("AT+CMQTTPUB=0,1,60\r\n", "OK", 2000)) return false;
+
+    return true;
+}
+
+// -------------------------------------------------
+// Conectar al Broker MQTT
+// -------------------------------------------------
+bool MQTT_ConnectToBroker(void)
+{
+    char cmd[128];
+    step = 3;
+
+    sprintf(cmd,"AT+CMQTTCONNECT=0,\"%s:%d\",60,1\r\n", host, port);
+    return SIMTransmit(cmd, "OK", 5000);
+}
+
+// -------------------------------------------------
+// Desconectar MQTT
+// -------------------------------------------------
+void MQTT_Disconnect(void)
+{
+    SIMTransmit("AT+CMQTTDISC=0,60\r\n", "OK", 500);
+    SIMTransmit("AT+CMQTTREL=0\r\n", "OK", 500);
+    SIMTransmit("AT+CMQTTSTOP\r\n", "OK", 500);
+}
+
+// -------------------------------------------------
+// Reset del módulo SIM
+// -------------------------------------------------
+void MQTT_Reset(void)
+{
+    SIMTransmit("AT+CFUN=1,1\r\n", "RDY", 5000);
+    HAL_Delay(2000);
+}
+

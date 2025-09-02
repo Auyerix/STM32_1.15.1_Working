@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;BlackPill_01_SIM76XX_01/Core/Src/mqtt_functions&apos; to &apos;mqtt_functions.c&apos;" description="Rename resource &apos;mqtt_functions&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="Core/Src/mqtt_functions" name="mqtt_functions.c" stamp="1756767983953" updateReferences="true"/>
+</session>

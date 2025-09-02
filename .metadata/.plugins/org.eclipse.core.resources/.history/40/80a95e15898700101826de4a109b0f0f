@@ -1,0 +1,13 @@
+/*
+ * mqtt_functions.h
+ *
+ *  Created on: Sep 1, 2025
+ *      Author: gusta
+ */
+
+#ifndef INC_MQTT_FUNCTIONS_H_
+#define INC_MQTT_FUNCTIONS_H_
+
+
+
+#endif /* INC_MQTT_FUNCTIONS_H_ */

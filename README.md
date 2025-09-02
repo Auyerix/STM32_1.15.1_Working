@@ -8,3 +8,4 @@ BlackPill_01 es un proyecto en blanco para la BlackPill STM32F401
 
 BlackPill_00 es un proyecto en blanco para la BlackPill STM32F411 (no probado)
 
+LWIP_TCP_SERVER_CLIENT_NETCONN5 es la revisión final del Proyecto PLCNext - Modbus presentado en la Especialización

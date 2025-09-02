@@ -18,12 +18,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
+#include "usart.h"
+#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <mqtt_functions.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MAX_AT_CMD_LEN 128
+////////////////////////////////////#define MAX_AT_CMD_LEN 128
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,30 +47,19 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim3;
-
-UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
 uint8_t step = 0;
 uint16_t count = 0;
-
-#define MAX_AT_CMD_LEN 128
-#define APN "gprs.claro.com.ar"       // Tu APN
-#define MQTT_CLIENT "cli01"
-
+uint32_t publishInterval = 10000; // 10 segundos
 // -----------------------------
 // Variables y configuración
 // -----------------------------
-char host[] = "tcp://test.mosquitto.org";
-int port = 1883;
+
 char topic[] = "test/topicXXX";
 char payload[] = "Hola desde STM32 + SIMCOM!";
-uint32_t publishInterval = 10000; // 10 segundos
 
-
-char buffer[256];
 
 //const char* MQTT_HOST = "test.mosquitto.org";
 //uint16_t MQTT_PORT = 1883;
@@ -75,161 +69,17 @@ char buffer[256];
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-// -------------------------------------------------
-// Función para transmitir AT y recibir respuesta
-// -------------------------------------------------
-bool SIMTransmitOLD(char *cmd, char* expected, uint32_t timeout_ms)
-{
-    memset(buffer, 0, sizeof(buffer));
-
-    // Enviar comando solo si cmd no es vacío
-    if(strlen(cmd) > 0)
-        HAL_UART_Transmit(&huart1, (uint8_t *)cmd, strlen(cmd), 1000);
-
-    HAL_UART_Receive(&huart1, (uint8_t *)buffer, sizeof(buffer), timeout_ms);
-
-    if (expected == NULL) return true; // no se espera respuesta
-    return (strstr(buffer, expected) != NULL);
-}
-bool SIMTransmit(char *cmd, char* expected, uint32_t timeout_ms)
-{
-    memset(buffer, 0, sizeof(buffer));
-
-    // Enviar comando solo si cmd no es vacío
-    if(strlen(cmd) > 0)
-        HAL_UART_Transmit(&huart1, (uint8_t *)cmd, strlen(cmd), 1000);
-
-    HAL_UART_Receive(&huart1, (uint8_t *)buffer, sizeof(buffer), timeout_ms);
-
-    if (expected == NULL) return true; // no se espera respuesta
-    return (strstr(buffer, expected) != NULL);
-}
-
-// -------------------------------------------------
-// Espera hasta que el módulo esté en red y con IP
-// -------------------------------------------------
-bool SIM_WaitForNetwork(uint32_t timeout_ms) {
-    uint32_t start = HAL_GetTick();
-
-    step = 1;
-    while ((HAL_GetTick() - start) < timeout_ms) {
-        // 1. Verificar si responde AT
-        SIMTransmit("AT\r\n", "OK", 1000);
-
-        // 2. Verificar registro en red
-        SIMTransmit("AT+CGREG?\r\n", "0,1", 2000);
-
-        // 3. Verificar GPRS adjunto
-        SIMTransmit("AT+CGATT?\r\n", "+CGATT: 1", 2000);
-
-        // 4. Obtener IP
-        SIMTransmit("AT+CGPADDR=1\r\n", NULL, 2000);
-        if (strstr(buffer, "10.") || strstr(buffer, "100.") ||
-            strstr(buffer, "172.") || strstr(buffer, "192.")) {
-            return true; // Todo listo
-        }
-
-        HAL_Delay(500);
-    }
-
-    return false; // Timeout
-}
-
-// -------------------------------------------------
-// Inicialización MQTT
-// -------------------------------------------------
-bool MQTT_Init(void)
-{
-    char cmd[MAX_AT_CMD_LEN];
-    step = 2;
-    // 1) Esperar que el módulo esté listo
-    if(!SIMTransmit("AT\r\n", "OK", 1000)) return false;
-
-    // 2) Registro en red
-    if(!SIMTransmit("AT+CGREG?\r\n", "OK", 1000)) return false;
-
-    // 3) Activar PDP
-    if(!SIMTransmit("AT+CGATT=1\r\n", "OK", 1000)) return false;
-    sprintf(cmd,"AT+CGDCONT=1,\"IP\",\"%s\"\r\n", APN);
-    if(!SIMTransmit(cmd, "OK", 1000)) return false;
-    if(!SIMTransmit("AT+CGACT=1,1\r\n", "OK", 1000)) return false;
-
-    // 4) Iniciar servicio MQTT
-    if(!SIMTransmit("AT+CMQTTSTART\r\n", "+CMQTTSTART: 0", 2000)) return false;
-
-    // 5) Crear cliente MQTT
-    sprintf(cmd,"AT+CMQTTACCQ=0,\"%s\"\r\n", MQTT_CLIENT);
-    if(!SIMTransmit(cmd, "OK", 2000)) return false;
-
-    return true;
-}
-
-// -------------------------------------------------
-// Publicar mensaje
-// -------------------------------------------------
-bool MQTT_Publish(const char* topic, const char* payload)
-{
-    char ATcommand[MAX_AT_CMD_LEN];
-
-    // -------------------------
-    // 1) Enviar TOPIC
-    // -------------------------
-    sprintf(ATcommand,"AT+CMQTTTOPIC=0,%d\r\n", strlen(topic));
-    SIMTransmit(ATcommand, NULL, 500);  // enviar comando, no esperar respuesta
-
-    // Enviar topic real SIN CRLF
-    SIMTransmit((char*)topic, NULL, 500);  // solo enviar datos
-
-    // -------------------------
-    // 2) Enviar PAYLOAD
-    // -------------------------
-    sprintf(ATcommand,"AT+CMQTTPAYLOAD=0,%d\r\n", strlen(payload));
-    if(!SIMTransmit(ATcommand, ">", 1000)) return false;  // esperar prompt >
-
-    // Enviar payload real
-    SIMTransmit((char*)payload, NULL, 500);  // solo enviar datos
-
-    // -------------------------
-    // 3) Publicar
-    // -------------------------
-    if(!SIMTransmit("AT+CMQTTPUB=0,1,60\r\n", "OK", 2000)) return false;
-
-    return true;
-}
-
-// -------------------------------------------------
-// Desconectar MQTT
-// -------------------------------------------------
-void MQTT_Disconnect(void)
-{
-    SIMTransmit("AT+CMQTTDISC=0,60\r\n", "OK", 500);
-    SIMTransmit("AT+CMQTTREL=0\r\n", "OK", 500);
-    SIMTransmit("AT+CMQTTSTOP\r\n", "OK", 500);
-}
-
-// -------------------------------------------------
-// Reset del módulo SIM
-// -------------------------------------------------
-void MQTT_Reset(void)
-{
-    SIMTransmit("AT+CFUN=1,1\r\n", "RDY", 5000);
-    HAL_Delay(2000);
-}
-
 
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  if (htim->Instance == TIM3) // confirmamos que viene de TIM2
+  if (htim->Instance == TIM3) // confirmamos que viene de TIM3
   {
     HAL_GPIO_TogglePin(LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin); // ejemplo:
   }
@@ -277,78 +127,113 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim3);// arranca timer en modo interrupción
 
+  uint32_t lastPublish = HAL_GetTick();
+  uint32_t now;
+  int retryCount;
+  const int maxRetries = 3;
+  bool disconnected = false;  // <-- declarada al inicio
+
+  Timer3_SetPeriod_ms(500);
+
+  // -----------------------------
+  // Esperar red celular
+  // -----------------------------
+  retryCount = 0;
+  while (!SIM_WaitForNetwork(60000)) {
+      retryCount++;
+      step = 50; // debug
+      if (retryCount >= maxRetries) {
+          MQTT_Reset();  // soft reset del módulo
+          retryCount = 0;
+      }
+  }
+
+  // -----------------------------
+  // Inicializar MQTT
+  // -----------------------------
+  retryCount = 0;
+  while (!MQTT_Init()) {
+      retryCount++;
+      step = 51;
+      if (retryCount >= maxRetries) {
+          MQTT_Reset();
+          retryCount = 0;
+      }
+  }
+
+
+  // -----------------------------
+  // Conectar al broker
+  // -----------------------------
+  retryCount = 0;
+  while (!MQTT_ConnectToBroker()) {
+      retryCount++;
+      step = 52;
+      if (retryCount >= maxRetries) {
+          MQTT_Reset();
+          // volver a inicializar MQTT
+          if (!MQTT_Init()) {
+              step = 51;
+          }
+          retryCount = 0;
+      }
+  }
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  // 1) Esperar que la SIM esté lista y en red
-  if(!SIM_WaitForNetwork(60000)) {
-      // ERROR: No hay red
-      // Aquí podés encender un LED o setear un flag
-	  step = 50;
-      while(1);
-  }
-
-  // 2) Inicializar MQTT (prepara cliente)
-  if(!MQTT_Init()) {
-      // ERROR: fallo al inicializar MQTT
-	  step = 51;
-      while(1);
-  }
-
-  // 3) Conectar al broker
-  char cmd[128];
-  sprintf(cmd,"AT+CMQTTCONNECT=0,\"%s:%d\",60,1\r\n", host, port);
-  if(!SIMTransmit(cmd, "OK", 5000)) {
-      // ERROR: no se pudo conectar al broker
-	  step = 52;
-      while(1);
-  }
-
-  // 4) Loop principal - publicar cada 10 segundos
-     uint32_t lastPublish = HAL_GetTick();
 
 
+	  while (1) {
 
-  while (1)
-  {
 
-	  Timer3_SetPeriod_ms(500);  // ahora el timer interrumpe cada 500ms
+		  now = HAL_GetTick();
 
-      uint32_t now = HAL_GetTick();
+		  if (0 /*Pulsador_Presionado()*/) {
+			  if (!disconnected) {
+				  MQTT_Disconnect();
+				  disconnected = true;
+				  step = 60;
+			  } else {
+				  if (MQTT_ConnectToBroker()) {
+					  disconnected = false;
+					  step = 61;
+				  }
+			  }
+		  }
 
-      if ((now - lastPublish) >= publishInterval) {
-          if(!MQTT_Publish(topic, payload)) {
-              // ERROR: falla al publicar
-              // Podés encender un LED, reintentar o setear un flag
-        	  step = 53;
-        	  step = 0;
-          } else {
-              // Publicación exitosa
-              // Podés setear un flag o actualizar un contador
-        	  count = count + 1;
-        	  step = 0;
+		  if (!disconnected && (now - lastPublish >= publishInterval)) {
+			  if (!MQTT_Publish(topic, payload)) {
+				  step = 53;
+				  retryCount++;
+				  if (retryCount >= maxRetries) {
+					  MQTT_Reset();
+					  retryCount = 0;
+				  }
+			  } else {
+				  count++;
+				  step = 0;
+				  retryCount = 0;
+			  }
+			  lastPublish = now;
+		  }
 
-          }
+		  HAL_Delay(100);
+	  }
 
-          lastPublish = now;
-      }
-
-      HAL_Delay(100); // pequeña pausa para no saturar el MCU
-
-  }
-
-  // Nunca se llega aquí, pero buena práctica
-  MQTT_Disconnect();
+      // nunca se alcanza, pero por buenas prácticas
+      MQTT_Disconnect();
 
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
 
+  /* USER CODE END 3 */
+}
 
 /**
   * @brief System Clock Configuration
@@ -393,114 +278,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 8400;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 5000;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : LED_ON_BOARD_Pin */
-  GPIO_InitStruct.Pin = LED_ON_BOARD_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_ON_BOARD_GPIO_Port, &GPIO_InitStruct);
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
