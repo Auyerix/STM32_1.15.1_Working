@@ -17,10 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
-#include "tim.h"
-#include "usart.h"
-#include "gpio.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -74,8 +71,7 @@ char payload[] = "Hola desde STM32 + SIMCOM!";
 // Array de LEDs a manejar
 LED_Handle myLeds[] = {
     {GPIOA, GPIO_PIN_3, LED_OFF},  // LED de red
-	{GPIOA, GPIO_PIN_4, LED_OFF},  // LED de MQTT
-	{LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin, LED_BLINK},  // LED on board
+	{LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin, LED_OFF},  // LED on board
     // {GPIOB, GPIO_PIN_5, LED_OFF},  // otro LED si querés
 };
 
@@ -218,17 +214,14 @@ int main(void)
 //      }
 //  }
 
-//  //Ejemplos de manejo de leds
-//  LED_SetState(GPIOA, GPIO_PIN_3, LED_BLINK); // buscando red
-//  HAL_Delay(5000);
-//
-//  LED_SetState(GPIOA, GPIO_PIN_3, LED_ON);    // conectado
-//  HAL_Delay(5000);
-//
-//  LED_SetState(GPIOA, GPIO_PIN_3, LED_OFF);   // error
-//  HAL_Delay(5000);
-//  LED_SetState(LED_ON_BOARD_GPIO_Port, LED_ON_BOARD_Pin, LED_OFF);   // error
-//	LED_SetState(GPIOA, GPIO_PIN_4, LED_ON);    // conectado
+  LED_SetState(GPIOA, GPIO_PIN_3, LED_BLINK); // buscando red
+  HAL_Delay(5000);
+
+  LED_SetState(GPIOA, GPIO_PIN_3, LED_ON);    // conectado
+  HAL_Delay(5000);
+
+  LED_SetState(GPIOA, GPIO_PIN_3, LED_OFF);   // error
+  HAL_Delay(5000);
 
   /* USER CODE END 2 */
 

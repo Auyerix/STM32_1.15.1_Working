@@ -5,7 +5,7 @@
 #include "main.h"
 #include "usart.h"
 #include <mqtt_functions.h>
-#include "led.h"
+
 
 
 char host[] = "tcp://test.mosquitto.org";
@@ -77,14 +77,15 @@ bool SIM_WaitForNetwork_Funcionaba(uint32_t timeout_ms) {
 bool SIM_WaitForNetwork(uint32_t timeout_ms) {
     uint32_t start = HAL_GetTick();
 
-    LED_SetState(GPIOA, GPIO_PIN_3, LED_BLINK); // mientras busca red
     step = 1;  // tu variable de debug
 
+    // Apagar LED al inicio
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
 
     while ((HAL_GetTick() - start) < timeout_ms) {
         // 1. Verificar si responde AT
         if (!SIMTransmit("AT\r\n", "OK", 1000)) {
-
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue; // si ni responde AT, reintentar
         }
@@ -92,14 +93,14 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
         // 2. Verificar registro en red (aceptar local y roaming)
         if (!SIMTransmit("AT+CGREG?\r\n", "0,1", 2000) &&
             !SIMTransmit("AT+CGREG?\r\n", "0,5", 2000)) {
-
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue;
         }
 
         // 3. Verificar GPRS adjunto
         if (!SIMTransmit("AT+CGATT?\r\n", "+CGATT: 1", 2000)) {
-
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue;
         }
@@ -108,11 +109,12 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
         SIMTransmit("AT+CGPADDR=1\r\n", NULL, 2000);
         if (strstr(buffer, "10.") || strstr(buffer, "100.") ||
             strstr(buffer, "172.") || strstr(buffer, "192.")) {
-
-        	LED_SetState(GPIOA, GPIO_PIN_3, LED_ON); //  conectado
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);  // LED encendido
             return true; // Todo listo
         }
-
+        else {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+        }
 
         HAL_Delay(500);
     }
@@ -124,8 +126,7 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
 // -------------------------------------------------
 bool MQTT_Init(void)
 {
-	LED_SetState(GPIOA, GPIO_PIN_4, LED_BLINK);
-	char cmd[MAX_AT_CMD_LEN];
+    char cmd[MAX_AT_CMD_LEN];
     step = 2;
     // 1) Esperar que el módulo esté listo
     if(!SIMTransmit("AT\r\n", "OK", 1000)) return false;
@@ -154,8 +155,7 @@ bool MQTT_Init(void)
 // -------------------------------------------------
 bool MQTT_Publish(const char* topic, const char* payload)
 {
-	LED_SetState(GPIOA, GPIO_PIN_4, LED_ON); // LED fijo mientras publica
-	char ATcommand[MAX_AT_CMD_LEN];
+    char ATcommand[MAX_AT_CMD_LEN];
 
     // -------------------------
     // 1) Enviar TOPIC
@@ -188,9 +188,7 @@ bool MQTT_Publish(const char* topic, const char* payload)
 // -------------------------------------------------
 bool MQTT_ConnectToBroker(void)
 {
-
-	LED_SetState(GPIOA, GPIO_PIN_4, LED_BLINK);
-	char cmd[128];
+    char cmd[128];
     step = 3;
 
     sprintf(cmd,"AT+CMQTTCONNECT=0,\"%s:%d\",60,1\r\n", host, port);
@@ -205,7 +203,6 @@ void MQTT_Disconnect(void)
     SIMTransmit("AT+CMQTTDISC=0,60\r\n", "OK", 500);
     SIMTransmit("AT+CMQTTREL=0\r\n", "OK", 500);
     SIMTransmit("AT+CMQTTSTOP\r\n", "OK", 500);
-    LED_SetState(GPIOA, GPIO_PIN_4, LED_OFF);
 }
 
 // -------------------------------------------------
@@ -215,6 +212,5 @@ void MQTT_Reset(void)
 {
     SIMTransmit("AT+CFUN=1,1\r\n", "RDY", 5000);
     HAL_Delay(2000);
-    LED_SetState(GPIOA, GPIO_PIN_4, LED_OFF);
 }
 
