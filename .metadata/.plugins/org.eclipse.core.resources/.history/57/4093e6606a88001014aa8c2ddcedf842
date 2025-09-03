@@ -1,0 +1,42 @@
+/*
+ * debounce.c
+ *
+ *  Created on: Sep 2, 2025
+ *      Author: gusta
+ */
+
+#include "debounce.h"
+#include "gpio.h"
+#include "stm32f4xx_hal.h" // o el header del HAL que uses
+
+
+// Retorna true solo una vez por cada pulsación completa
+bool Pulsador_Presionado(void) {
+    static bool lastState = true;      // Estado anterior del botón (HIGH = no presionado)
+    static bool eventTriggered = false;
+    static uint32_t lastDebounceTime = 0;
+
+    bool currentState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0); // Leer botón
+    uint32_t now = HAL_GetTick();
+
+    // Si cambió el estado, reinicia el debounce
+    if (currentState != lastState) {
+        lastDebounceTime = now;
+    }
+
+    // Si pasó el tiempo de debounce y detectamos flanco descendente
+    if ((now - lastDebounceTime) > 50) {
+        if (!currentState && lastState) { // HIGH → LOW
+            eventTriggered = true;
+        }
+    }
+
+    lastState = currentState;
+
+    if (eventTriggered) {
+        eventTriggered = false; // Limpiar evento para no repetirlo
+        return true;            // Devuelve un solo pulso
+    }
+
+    return false;
+}

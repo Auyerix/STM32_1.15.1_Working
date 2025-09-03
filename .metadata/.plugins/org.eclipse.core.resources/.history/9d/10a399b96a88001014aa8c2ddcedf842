@@ -1,0 +1,20 @@
+/*
+ * debounce.c
+ *
+ *  Created on: Sep 2, 2025
+ *      Author: gusta
+ */
+
+#include "debounce.h"
+#include "gpio.h"
+#include "stm32f4xx_hal.h" // o el header del HAL que uses
+
+
+// Simple lectura directa, HIGH = no presionado, LOW = presionado
+bool Pulsador_Presionado(void) {
+    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
+        return true;  // botón presionado
+    } else {
+        return false; // botón no presionado
+    }
+}

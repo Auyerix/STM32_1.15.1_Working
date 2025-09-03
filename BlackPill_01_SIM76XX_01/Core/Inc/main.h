@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define LED_ON_BOARD_GPIO_Port GPIOC
 #define User_Key_Pin GPIO_PIN_0
 #define User_Key_GPIO_Port GPIOA
+#define LED1_Pin GPIO_PIN_3
+#define LED1_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

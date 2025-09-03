@@ -78,9 +78,14 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
     uint32_t start = HAL_GetTick();
 
     step = 1;  // tu variable de debug
+
+    // Apagar LED al inicio
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+
     while ((HAL_GetTick() - start) < timeout_ms) {
         // 1. Verificar si responde AT
         if (!SIMTransmit("AT\r\n", "OK", 1000)) {
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue; // si ni responde AT, reintentar
         }
@@ -88,12 +93,14 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
         // 2. Verificar registro en red (aceptar local y roaming)
         if (!SIMTransmit("AT+CGREG?\r\n", "0,1", 2000) &&
             !SIMTransmit("AT+CGREG?\r\n", "0,5", 2000)) {
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue;
         }
 
         // 3. Verificar GPRS adjunto
         if (!SIMTransmit("AT+CGATT?\r\n", "+CGATT: 1", 2000)) {
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED apagado si no responde
             HAL_Delay(500);
             continue;
         }
@@ -102,7 +109,11 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
         SIMTransmit("AT+CGPADDR=1\r\n", NULL, 2000);
         if (strstr(buffer, "10.") || strstr(buffer, "100.") ||
             strstr(buffer, "172.") || strstr(buffer, "192.")) {
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);  // LED encendido
             return true; // Todo listo
+        }
+        else {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
         }
 
         HAL_Delay(500);

@@ -1,0 +1,40 @@
+/*
+ * debounce.c
+ *
+ *  Created on: Sep 2, 2025
+ *      Author: gusta
+ */
+
+#include <debounce.h>
+#include "gpio.h"
+
+
+bool Pulsador_Presionado(void) {
+    static uint32_t lastDebounceTime = 0;
+    static bool lastStableState = GPIO_PIN_SET;  // Pull-up -> no presionado = HIGH
+    static bool pressedEvent = false;
+
+    bool currentState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0); // PA0 = botón
+    uint32_t now = HAL_GetTick();
+
+    // Si el estado cambió, reinicia debounce
+    if (currentState != lastStableState) {
+        lastDebounceTime = now;
+    }
+
+    // Si el estado se mantuvo estable más de 50 ms
+    if ((now - lastDebounceTime) > 50) {
+        // Detectar flanco descendente
+        if (lastStableState == GPIO_PIN_SET && currentState == GPIO_PIN_RESET) {
+            pressedEvent = true;
+        }
+        lastStableState = currentState;
+    }
+
+    if (pressedEvent) {
+        pressedEvent = false; // Limpiar evento
+        return true;          // Pulsación detectada
+    }
+
+    return false;
+}

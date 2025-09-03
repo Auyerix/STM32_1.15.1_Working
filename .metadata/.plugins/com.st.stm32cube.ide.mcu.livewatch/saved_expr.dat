@@ -10,8 +10,6 @@ IP_To_Eeprom
 auxiliar
 SystemCoreClock
 step
-ATisOK
-CGREGisOK
 count
 buffer
 retryCount

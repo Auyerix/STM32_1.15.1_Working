@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <mqtt_functions.h>
+#include <debounce.h>
 
 /* USER CODE END Includes */
 
@@ -128,56 +129,69 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim3);// arranca timer en modo interrupción
 
   uint32_t lastPublish = HAL_GetTick();
-  uint32_t now;
   int retryCount;
   const int maxRetries = 3;
-  bool disconnected = false;  // <-- declarada al inicio
+
 
   Timer3_SetPeriod_ms(500);
 
-  // -----------------------------
-  // Esperar red celular
-  // -----------------------------
-  retryCount = 0;
-  while (!SIM_WaitForNetwork(60000)) {
-      retryCount++;
-      step = 50; // debug
-      if (retryCount >= maxRetries) {
-          MQTT_Reset();  // soft reset del módulo
-          retryCount = 0;
-      }
-  }
+//  while(1) {
+//      if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) { // botón presionado
+//          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);     // LED encendido
+//      } else {
+//          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);   // LED apagado
+//      }
+//  }
 
-  // -----------------------------
-  // Inicializar MQTT
-  // -----------------------------
-  retryCount = 0;
-  while (!MQTT_Init()) {
-      retryCount++;
-      step = 51;
-      if (retryCount >= maxRetries) {
-          MQTT_Reset();
-          retryCount = 0;
-      }
-  }
+//  while (1) {
+//      if (Pulsador_Presionado()) {
+//          HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_3); // cada pulsación cambia el estado del LED
+//      }
+//  }
 
-
-  // -----------------------------
-  // Conectar al broker
-  // -----------------------------
-  retryCount = 0;
-  while (!MQTT_ConnectToBroker()) {
-      retryCount++;
-      step = 52;
-      if (retryCount >= maxRetries) {
-          MQTT_Reset();
-          // volver a inicializar MQTT
-          if (!MQTT_Init()) {
-              step = 51;
-          }
-          retryCount = 0;
-      }
-  }
+//  // -----------------------------
+//  // Esperar red celular
+//  // -----------------------------
+//  retryCount = 0;
+//  while (!SIM_WaitForNetwork(60000)) {
+//      retryCount++;
+//      step = 50; // debug
+//      if (retryCount >= maxRetries) {
+//          MQTT_Reset();  // soft reset del módulo
+//          retryCount = 0;
+//      }
+//  }
+//
+//  // -----------------------------
+//  // Inicializar MQTT
+//  // -----------------------------
+//  retryCount = 0;
+//  while (!MQTT_Init()) {
+//      retryCount++;
+//      step = 51;
+//      if (retryCount >= maxRetries) {
+//          MQTT_Reset();
+//          retryCount = 0;
+//      }
+//  }
+//
+//
+//  // -----------------------------
+//  // Conectar al broker
+//  // -----------------------------
+//  retryCount = 0;
+//  while (!MQTT_ConnectToBroker()) {
+//      retryCount++;
+//      step = 52;
+//      if (retryCount >= maxRetries) {
+//          MQTT_Reset();
+//          // volver a inicializar MQTT
+//          if (!MQTT_Init()) {
+//              step = 51;
+//          }
+//          retryCount = 0;
+//      }
+//  }
 
 
   /* USER CODE END 2 */
@@ -187,45 +201,68 @@ int main(void)
 
 
 
-	  while (1) {
+  while (1) {
+      // 1) Esperar red y SIM lista
+      if (!SIM_WaitForNetwork(60000)) {
+          step = 50;
+          MQTT_Reset();
+          HAL_Delay(1000);
+          continue; // vuelve a intentar desde el inicio
+      }
 
+      // 2) Inicializar MQTT
+      if (!MQTT_Init()) {
+          step = 51;
+          MQTT_Reset();
+          HAL_Delay(1000);
+          continue; // vuelve a intentar desde el inicio
+      }
 
-		  now = HAL_GetTick();
+      // 3) Conectar al broker
+      if (!MQTT_ConnectToBroker()) {
+          step = 52;
+          MQTT_Reset();
+          HAL_Delay(1000);
+          continue; // vuelve a intentar desde el inicio
+      }
 
-		  if (0 /*Pulsador_Presionado()*/) {
-			  if (!disconnected) {
-				  MQTT_Disconnect();
-				  disconnected = true;
-				  step = 60;
-			  } else {
-				  if (MQTT_ConnectToBroker()) {
-					  disconnected = false;
-					  step = 61;
-				  }
-			  }
-		  }
+      // 4) Loop de publicación periódica
+      lastPublish = HAL_GetTick();
+      retryCount = 0;
 
-		  if (!disconnected && (now - lastPublish >= publishInterval)) {
-			  if (!MQTT_Publish(topic, payload)) {
-				  step = 53;
-				  retryCount++;
-				  if (retryCount >= maxRetries) {
-					  MQTT_Reset();
-					  retryCount = 0;
-				  }
-			  } else {
-				  count++;
-				  step = 0;
-				  retryCount = 0;
-			  }
-			  lastPublish = now;
-		  }
+      while (1) {
+          uint32_t now = HAL_GetTick();
 
-		  HAL_Delay(100);
-	  }
+          // Revisar si la SIM sigue conectada
+          if (!SIM_WaitForNetwork(1000)) {
+              step = 50;
+              MQTT_Reset();
+              break; // sale del loop interno para reiniciar todo
+          }
 
-      // nunca se alcanza, pero por buenas prácticas
-      MQTT_Disconnect();
+          if ((now - lastPublish) >= publishInterval) {
+              if (!MQTT_Publish(topic, payload)) {
+                  step = 53;
+                  retryCount++;
+                  if (retryCount >= maxRetries) {
+                      MQTT_Reset();
+                      retryCount = 0;
+                      break; // sale del loop interno para reiniciar todo
+                  }
+              } else {
+                  count++;
+                  step = 0;
+                  retryCount = 0;
+              }
+              lastPublish = now;
+          }
+
+          HAL_Delay(100);
+      }
+  }
+
+  // nunca se alcanza, pero por buenas prácticas
+  MQTT_Disconnect();
 
 
     /* USER CODE END WHILE */
