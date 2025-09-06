@@ -76,11 +76,8 @@ bool SIM_WaitForNetwork_Funcionaba(uint32_t timeout_ms) {
 // -------------------------------------------------
 bool SIM_WaitForNetwork(uint32_t timeout_ms) {
     uint32_t start = HAL_GetTick();
-    static bool yaConectado = false;
-    if (!yaConectado) {
-    	LED_SetState(GPIOA, GPIO_PIN_3, LED_BLINK); // mientras busca red
-    }
 
+    LED_SetState(GPIOA, GPIO_PIN_3, LED_BLINK); // mientras busca red
     step = 1;  // tu variable de debug
 
 
@@ -113,14 +110,13 @@ bool SIM_WaitForNetwork(uint32_t timeout_ms) {
             strstr(buffer, "172.") || strstr(buffer, "192.")) {
 
         	LED_SetState(GPIOA, GPIO_PIN_3, LED_ON); //  conectado
-        	yaConectado = true;
             return true; // Todo listo
         }
 
 
         HAL_Delay(500);
     }
-    yaConectado = false; // si falla, la próxima vez sí volverá a blinkear
+
     return false; // Timeout
 }
 // -------------------------------------------------
