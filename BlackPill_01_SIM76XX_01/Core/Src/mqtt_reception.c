@@ -1,0 +1,191 @@
+/*
+ * mqtt_reception.c
+ *
+ *  Created on: Sep 8, 2025
+ *      Author: gusta
+ */
+#include "mqtt_reception.h"
+#include <string.h>
+
+
+
+// Variables globales (definidas acá, declaradas como extern en .h)
+char rx_topic[MQTT_TOPIC_SIZE];
+char rx_payload[MQTT_PAYLOAD_SIZE];
+bool new_message_flag = false;
+
+static uint16_t rx_index = 0;   // solo local en este .c
+
+// agrega un char al buffer y corta si se desborda
+void RX_AppendChar(char c) {
+    if (rx_index < RX_BUFFER_SIZE - 1) {
+        rx_buffer[rx_index++] = c;
+        rx_buffer[rx_index] = '\0';
+    } else {
+        rx_index = 0; // resetea buffer si se desborda
+    }
+}
+
+// parsea el buffer y extrae topic y payload
+bool MQTT_ParseReceived(void) {
+    // Ejemplo esperado: +CMQTTRX: "topic","payload"
+    char* p = strstr(rx_buffer, "+CMQTTRX:");
+    if (!p) return false;
+
+    // saltar prefijo
+    p += 9;
+
+    // buscar primer comilla
+    char* start_topic = strchr(p, '"');
+    if (!start_topic) return false;
+    start_topic++;
+
+    // buscar cierre de comilla
+    char* end_topic = strchr(start_topic, '"');
+    if (!end_topic) return false;
+
+    size_t topic_len = end_topic - start_topic;
+    if (topic_len >= MQTT_TOPIC_SIZE) topic_len = MQTT_TOPIC_SIZE - 1;
+    strncpy(rx_topic, start_topic, topic_len);
+    rx_topic[topic_len] = '\0';
+
+    // buscar inicio del payload (después de la siguiente comilla)
+    char* start_payload = strchr(end_topic + 1, '"');
+    if (!start_payload) return false;
+    start_payload++;
+
+    char* end_payload = strchr(start_payload, '"');
+    if (!end_payload) return false;
+
+    size_t payload_len = end_payload - start_payload;
+    if (payload_len >= MQTT_PAYLOAD_SIZE) payload_len = MQTT_PAYLOAD_SIZE - 1;
+    strncpy(rx_payload, start_payload, payload_len);
+    rx_payload[payload_len] = '\0';
+
+    // limpiar buffer
+    rx_index = 0;
+    rx_buffer[0] = '\0';
+
+    new_message_flag = true;
+    return true;
+}
+
+//// suscribirse a un topic
+//bool MQTT_Subscribe(const char* topic) {
+//    char cmd[128];
+//    snprintf(cmd, sizeof(cmd), "AT+CMQTTSUB=0,1,\"%s\",1\r\n", topic);
+//    return SIMTransmit(cmd, "OK", 5000);
+//}
+
+//// suscribirse a un topic
+//int MQTT_Subscribe(const char *topic) {
+//    char cmd[64];
+//    int topic_len = strlen(topic);
+//
+//    // 1) Definir el tópico
+//    snprintf(cmd, sizeof(cmd), "AT+CMQTTSUBTOPIC=0,%d,1", topic_len);
+//    if (!SIMTransmit(cmd, topic, 5000)) {
+//        return 0;   // fallo al definir el tópico
+//    }
+//
+//    // 2) Ejecutar la suscripción
+//    if (!SIMTransmit("AT+CMQTTSUB=0", NULL)) {
+//        return 0;   // fallo al suscribirse
+//    }
+//
+//    return 1;  // todo OK
+//}
+
+//// suscribirse a un topic
+//bool MQTT_Subscribe(const char* topic)
+//{
+//    char cmd[160];
+//    char topic_crlf[MQTT_TOPIC_SIZE + 4];
+//    int tlen = (int)strlen(topic);
+//
+//    // Paso 1: enviar comando con la longitud del tópico
+//    snprintf(cmd, sizeof(cmd), "AT+CMQTTSUBTOPIC=0,%d,1\r\n", tlen);
+//    if (!SIMTransmit(cmd, ">", 3000)) {
+//        return false; // no recibimos el prompt
+//    }
+//
+//    // Paso 2: enviar el tópico
+//    snprintf(topic_crlf, sizeof(topic_crlf), "%s\r\n", topic);
+//    if (!SIMTransmit(topic_crlf, "OK", 4000)) {
+//        return false; // no recibimos OK después del tópico
+//    }
+//
+//    // Paso 3: confirmar la suscripción
+//    if (!SIMTransmit("AT+CMQTTSUB=0\r\n", "OK", 4000)) {
+//        return false; // no recibimos OK del SUB
+//    }
+//
+//    // Verificamos notificación final
+//    if (strstr(rx_buffer, "+CMQTTSUB: 0,0") != NULL) {
+//        return true; // suscripción exitosa
+//    }
+//
+//    return false; // no apareció confirmación
+//}
+//
+//// suscribirse a un topic
+//
+//bool MQTT_Subscribe(const char* topic) {
+//    char cmd[64];
+//    size_t topic_len = strlen(topic);
+//
+//    if (topic_len == 0 || topic_len >= MQTT_TOPIC_SIZE) {
+//        return false; // tópico inválido
+//    }
+//
+//    // Paso 1: indicar tópico y QoS
+//    snprintf(cmd, sizeof(cmd), "AT+CMQTTSUBTOPIC=0,%u,1\r\n", (unsigned int)topic_len);
+//    if (!SIMTransmit(cmd, ">", 5000)) {
+//        return false;
+//    }
+//
+//    // Paso 1b: enviar el tópico
+//    if (!SIMTransmit(topic, "OK", 5000)) {
+//        return false;
+//    }
+//
+//    // Paso 2: ejecutar la suscripción
+//    if (!SIMTransmit("AT+CMQTTSUB=0\r\n", "OK", 5000)) {
+//        return false;
+//    }
+//
+//    // Si llegamos acá, la suscripción se considera exitosa
+//    return true;
+//}
+
+// suscribirse a un topic
+bool MQTT_Subscribe(const char* topic)
+{
+    char cmd[160];
+    char topic_crlf[MQTT_TOPIC_SIZE + 4];
+    int tlen = (int)strlen(topic);
+
+    // Paso 1: enviar comando con la longitud del tópico
+    snprintf(cmd, sizeof(cmd), "AT+CMQTTSUBTOPIC=0,%d,1\r\n", tlen);
+    if (!SIMTransmit(cmd, ">", 3000)) {
+        return false; // no recibimos el prompt
+    }
+
+    // Paso 2: enviar el tópico
+    snprintf(topic_crlf, sizeof(topic_crlf), "%s\r\n", topic);
+    if (!SIMTransmit(topic_crlf, "OK", 4000)) {
+        return false; // no recibimos OK después del tópico
+    }
+
+    // Paso 3: confirmar la suscripción
+    if (!SIMTransmit("AT+CMQTTSUB=0\r\n", "OK", 4000)) {
+        return false; // no recibimos OK del SUB
+    }
+
+//    // Verificamos notificación final
+//    if (strstr(rx_buffer, "+CMQTTSUB: 0,0") != NULL) {
+//        return true; // suscripción exitosa
+//    }
+
+    return true; // no apareció confirmación
+}

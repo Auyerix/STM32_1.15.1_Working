@@ -271,12 +271,12 @@ int main(void)
 
 
       // 4) Suscribirse al topic de recepción
-      if (!MQTT_Subscribe(rxTopic)) {
-          step = 54;
-          MQTT_Reset();
-          HAL_Delay(1000);
-          continue;
-      }
+//      if (!MQTT_Subscribe(rxTopic)) {
+//          step = 54;
+//          MQTT_Reset();
+//          HAL_Delay(1000);
+//          continue;
+//      }
 
 
 

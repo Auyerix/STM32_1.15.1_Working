@@ -65,6 +65,7 @@ void Error_Handler(void);
 #define LED1_GPIO_Port GPIOA
 #define LED2_Pin GPIO_PIN_4
 #define LED2_GPIO_Port GPIOA
+//#define RX_BUFFER_SIZE 512
 
 /* USER CODE BEGIN Private defines */
 

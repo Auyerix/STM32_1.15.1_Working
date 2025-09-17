@@ -1,9 +1,9 @@
 ../Core/Src/mqtt_functions.c:18:6:SIMTransmit_OLD	24	static
 ../Core/Src/mqtt_functions.c:31:6:SIMTransmit	24	static
-../Core/Src/mqtt_functions.c:48:6:SIM_WaitForNetwork_Funcionaba	24	static
-../Core/Src/mqtt_functions.c:77:6:SIM_WaitForNetwork	24	static
-../Core/Src/mqtt_functions.c:129:6:MQTT_Init	136	static
-../Core/Src/mqtt_functions.c:159:6:MQTT_Publish	144	static
-../Core/Src/mqtt_functions.c:193:6:MQTT_ConnectToBroker	136	static
-../Core/Src/mqtt_functions.c:207:6:MQTT_Disconnect	8	static
-../Core/Src/mqtt_functions.c:218:6:MQTT_Reset	8	static
+../Core/Src/mqtt_functions.c:49:6:SIM_WaitForNetwork_Funcionaba	24	static
+../Core/Src/mqtt_functions.c:78:6:SIM_WaitForNetwork	24	static
+../Core/Src/mqtt_functions.c:130:6:MQTT_Init	136	static
+../Core/Src/mqtt_functions.c:160:6:MQTT_Publish	144	static
+../Core/Src/mqtt_functions.c:194:6:MQTT_ConnectToBroker	136	static
+../Core/Src/mqtt_functions.c:208:6:MQTT_Disconnect	8	static
+../Core/Src/mqtt_functions.c:219:6:MQTT_Reset	8	static

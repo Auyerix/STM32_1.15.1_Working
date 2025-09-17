@@ -270,13 +270,28 @@ int main(void)
       }
 
 
-      // 4) Suscribirse al topic de recepción
-      if (!MQTT_Subscribe(rxTopic)) {
-          step = 54;
-          MQTT_Reset();
-          HAL_Delay(1000);
-          continue;
+
+
+      // 📥 Chequeo de recepción de mensajes MQTT
+      if (MQTT_ParseReceived()) {
+          // acá tenés disponibles los globales:
+          // rx_topic → tópico del mensaje recibido
+          // rx_payload → payload recibido
+
+          // ejemplo: reaccionar a un payload
+          if (strcmp(rx_topic, "mi/topic/de/subscripcion") == 0) {
+              if (strcmp(rx_payload, "ON") == 0) {
+                  LED_SetState(GPIOA, GPIO_PIN_3, LED_ON);
+              } else if (strcmp(rx_payload, "OFF") == 0) {
+                  LED_SetState(GPIOA, GPIO_PIN_3, LED_OFF);
+              }
+          }
+
+          new_message_flag = false; // limpiar flag
       }
+
+
+
 
 
 
@@ -312,17 +327,7 @@ int main(void)
               lastPublish = now;
           }
 
-          // -------------------------------
-          // Chequeo de mensajes recibidos
-          // -------------------------------
-          if (MQTT_ParseReceived()) {
-              // Aquí ya tenés rxTopic y rxPayload cargados
-              // Podés actuar según el mensaje recibido
-              // Ejemplo:
-              if (strcmp(rxTopic, "mi/topic/de/subscripcion") == 0) {
-                  // manejar rxPayload
-              }
-          }
+
 
 
 

@@ -9,6 +9,7 @@
 #define INC_MQTT_FUNCTIONS_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 
 extern uint8_t step;   // declaración externa
 
