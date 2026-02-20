@@ -1,1 +1,8 @@
 Shift boton derecho o ctl boton derecho y abro el git bash, desde ahí comiteo y además hago el push al repo (que tengo que haber creado antes)
+
+En CMD directamente:
+git status
+git add .
+git commit -m "Agregado Proyecto Flash"
+git push -u origen main
+
